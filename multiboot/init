@@ -72,6 +72,7 @@ echo "Choose os to boot " > /dev/tty1
 echo "	enter 1 for Slackware 14.2" > /dev/tty1
 echo "  enter 2 for Ubuntu " > /dev/tty1
 echo "  enter 3 for Slackware setup " > /dev/tty1
+echo "  enter 4 to boot ubuntu-16.04-mate-odroid-u2u3-20160920.img" >> /dev/tty1
 echo "  any other for Slackware 14.2" > /dev/tty1
 echo "        " > /dev/tty1
 # default, slackware, 10 seconds timeout.
@@ -87,6 +88,20 @@ case $ans in
 	;;
 	'3')
 		boot_distro /root/slackware-14.2.setup /slackware
+	;;
+	'4')
+		# test -d /root/ubuntu-16.04.1.lts || mkdir /root/ubuntu-16.04.1.lts
+		# find info about partitions
+		# xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=x.img count=100
+		# file x.img
+		# rm x.img
+		6.04-mate-odroid-u2u3-20160920.img.xz | dd of=ubuntu-16.04-mate-odroid-u2u3-20160920.img count=9216000 skip=268288
+		loopdev=$(losetup -f /root/images/ubuntu-16.04-mate-odroid-u2u3-20160920.img )
+		# mount /dev/sda2 /root/mnt
+		# mount $(loopdev) /root/ubuntu-16.04.1.lts
+		mount /dev/loop0 /root/ubuntu-16.04.1.lts
+		# /bin/sh </dev/tty1 >/dev/tty1 2>&1
+		boot_distro /root/ubuntu-16.04.1.lts /ubuntu
 	;;
 	*)
 		boot_distro /root/slackware-14.2 /slackware
