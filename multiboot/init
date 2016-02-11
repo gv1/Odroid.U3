@@ -1,6 +1,6 @@
 #!/bin/sh 
 
-# . multiboot.cfg
+# . multiboot.conf
 export debug=0
 # if [ ${debug} .eq 0 ]; then
 set -x
@@ -11,8 +11,6 @@ export PATH=/sbin:/usr/sbin:/bin:/usr/bin
 mount -t sysfs -o nodev,noexec,nosuid sysfs /sys
 mount -t proc -o nodev,noexec,nosuid proc /proc
 ln -sf /proc/mounts /etc/mtab
-
-echo "Loading, please wait..." > /dev/tty1
 
 if ! mount -t devtmpfs -o nosuid,mode=0755 udev /dev; then
 	echo "W: devtmpfs not available, falling back to tmpfs for /dev"
@@ -53,98 +51,110 @@ export mnt=/mnt1
 
 move_dirs()
 {
-    echo "moving dev etc to /root" > /dev/tty1
     rootmnt=$1
     udevadm control --exit
+    if [ -d ${rootmnt}/dev ]; then 
+	mv ${rootmnt}/dev ${rootmnt}/dev.org
+	mkdir ${rootmnt}/dev
+    fi
     mount -n -o move /dev ${rootmnt}/dev
     rm -rf /dev
     ln -s ${rootmnt}/dev /dev
+    if [ -d ${rootmnt}/run ]; then  
+	    mv ${rootmnt}/run ${rootmnt}/run.org  
+	    mkdir ${rootmnt}/run
+    fi 
     mount -n -o move /run ${rootmnt}/run
+    if [ -d ${rootmnt}/sys ]; then
+	   mv ${rootmnt}/sys ${rootmnt}/sys.org
+	   mkdir ${rootmnt}/sys
+    fi 
     mount -n -o move /sys ${rootmnt}/sys
+    if [ -d ${rootmnt}/proc ]; then
+	   mv ${rootmnt}/proc ${rootmnt}/proc.org
+	   mkdir ${rootmnt}/proc
+    fi
     mount -n -o move /proc ${rootmnt}/proc
 }
-
-# echo "third shell" > /dev/tty1
-# /bin/sh < /dev/tty1 > /dev/tty1
-echo "run-init" > /dev/tty1
 
 
 boot_dir ()
 {
-    
-    subdir=$1
-    device=$2 
-    
-    
-    if [ -z ${device} ]; then
-	# subdir is where the distro is.
-	if [ -d ${subdir} ]; then
-	    echo "Fatal error: ${subdir} not found"
-	    read key
-	  exit 1;
-	fi
-    else
-	# we need to mount ${device} to get ${mnt}/${subdir}
-	if [ ${subdir} != "/" ]; then
-	    mount ${device} ${mnt} || ( echo "Fatal error: fail to mount ${device} at ${mnt}"; read key; exit 1; )
-	    # boot from subdir.
-	    # distro allready mounted and avaiable.
-	    if [ -d ${mnt}/${subdir} ]; then
-		mount --bind ${mnt}/${subdir} ${rootmnt}
-	    else # distro not at ${distro}.
-		echo "Fatal Error : ${subdir} not found on ${device}"
-		read key;
-		exit 1;
-	    fi
-	else 
-	    # boot from partition ${device}
-	    mount ${device} ${rootmnt}
-	fi
-    fi
-    
-    move_dirs ${rootmnt}
-    cd ${rootmnt}
-    if [ ${debug} -eq 1 ] ; then
+   
+   subdir=$1
+   device=$2 
+   
+   if [ -z ${device} ]; then
+# subdir is where the distro is.
+     if [ -d ${subdir} ]; then # distro in subdir
+        mount --bind ${subdir} ${rootmnt} 
+     elif [ -d ${mnt}/mnt ]; then # image
+        mount --bind ${mnt}/mnt ${rootmnt}
+     else
+         echo "Fatal error: ${subdir} not found" > /dev/tty1
+         read key
+         exit 1;
+     fi
+   else
+       if [ ${subdir} != "/" ]; then
+         mount ${device} ${mnt} || ( echo "Fatal error: fail to mount ${device} at ${mnt}" > /dev/tty1; read key; exit 1; )
+         # boot from subdir.
+         # distro allready mounted and avaiable.
+         if [ -d ${mnt}/${subdir} ]; then
+             mount --bind ${mnt}/${subdir} ${rootmnt}
+         else # distro not at ${distro}.
+	     echo "Fatal Error : ${subdir} not found on ${device}"
+	     read key;
+	     exit 1;
+         fi
+       else 
+        # boot from partition ${device}
+        mount ${device} ${rootmnt}
+       fi
+   fi
+       
+   move_dirs ${rootmnt}
+   cd ${rootmnt}
+   if [ ${debug} -eq 1 ] ; then
 	/bin/sh </dev/tty1 >/dev/tty1 2>&1
-    fi
-    pivotroot . initrd
-    if [ ${debug} -eq 2 ] ; then
+   fi
+   pivotroot . initrd
+   if [ ${debug} -eq 2 ] ; then
 	exec chroot . /bin/sh </dev/console >/dev/console 2>&1
-    else
+   else
 	exec chroot . ${init} <dev/console >dev/console 2>&1
-    fi
+   fi
 }
 
 boot_img ()
 {
     img=$1 
     device=$2
-    
-    [ -d ${mnt} ] || mkdir ${mnt}
+    # remove this delay, meant for wait for flash drive.
+    sleep 1;
     
     if [ ! -z ${device} ]; then
-	mount ${device} ${mnt}
-	if [ -f ${mnt}/${img} ]; then
-	    loopdev=$(losetup -f ${mnt}/${img})
-	else
-	    echo "Fatal error: ${mnt}/${img} not found";
-	    read key
-	    exit 1
-	fi
+	mount ${device} ${mnt} || { echo "Fatal error unable to mount ${device}"; read key ; exit 1;}
+        if [ -f ${mnt}/${img} ]; then
+ 	    loopdev=$(losetup -f ${mnt}/${img})
+ 	else
+ 	    echo "Fatal error: ${mnt}/${img} not found";
+ 	    read key
+ 	    exit 1
+ 	fi
     else
-	if [ -f ${img} ]; then
-	    loopdev=$(losetup -f /${img})
-	else
+ 	if [ -f ${img} ]; then
+ 	    loopdev=$(losetup -f /${img})
+ 	else
 	    echo "Fatal error: ${img} not found";
-	    read key
-	    exit 1
-	fi
+ 	    read key
+ 	    exit 1
+ 	fi
     fi
-    
-    mount /dev/loop0 ${rootmnt}
-    boot_dir ${rootmnt}
+    test -d ${mnt}/mnt || mkdir ${mnt}/mnt 
+    mount /dev/loop0 ${mnt}/mnt
+    boot_dir ${mnt}/mnt
 }
-
 
 # ubuntu OK
 # boot_ubuntu 
@@ -153,10 +163,11 @@ echo "Choose os to boot " > /dev/tty1
 echo "	enter 1 for Slackware 14.2" > /dev/tty1
 echo "  enter 2 for Ubuntu " > /dev/tty1
 echo "  enter 3 for Slackware setup " > /dev/tty1
-echo "  enter 4 to boot ubuntu-16.04-mate-odroid-u2u3-20160920.img" >> /dev/tty1
+echo "  enter 4 to boot ubuntu-16.04-mate-odroid-u2u3-20160920.img" > /dev/tty1
 echo "  enter 5 to boot piCore-8.0"  > /dev/tty1
 echo "  enter 6 to boot ArchLinux"  > /dev/tty1
-echo "  enter 7 to boot Quirky"  > /dev/tty1
+echo "  enter 7 to boot Quirky NA"  > /dev/tty1
+echo "  enter 8 ti boot ubuntu-16.04-minimal-odroid-xu3-20160706.img /dev/sda1" > /dev/tty1
 echo "  any other key " > /dev/tty1
 echo "  or after a delay of 10 seconds boot to slackware 14.2" > /dev/tty1
 echo "        " > /dev/tty1
@@ -177,20 +188,7 @@ case $ans in
 	boot_dir slackware-14.2.setup /dev/mmcblk0p3
 	;;
     '4')
-	# test -d /root/ubuntu-16.04.1.lts || mkdir /root/ubuntu-16.04.1.lts
-	# find info about partitions
-	# xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=x.img count=1
-	# file x.img
-	# rm x.img
-	# xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=ubuntu-16.04-mate-odroid-u2u3-20160920.img count=9216000 skip=268288
-	# mount /dev/sda2 /root/mnt
-	# mount $(loopdev) /root/ubuntu-16.04.1.lts
-
-	# loopdev=$(losetup -f /root/images/ubuntu-16.04-mate-odroid-u2u3-20160920.img )
-	# mount /dev/loop0 /root/ubuntu-16.04.1.lts
-	# boot_dir /root/ubuntu-16.04.1.lts
-	# /bin/sh </dev/tty1 >/dev/tty1 2>&1
-	boot_img /images/ubuntu-16.04-mate-odroid-u2u3-20160920.img /dev/mmcblk0p3
+	boot_img /ubuntu-16.04-mate-odroid-u2u3-20160920.img /dev/sda1
 	;;
     '5')
 	boot_dir piCore-8.0 /dev/mmcblk0p3
@@ -199,7 +197,12 @@ case $ans in
 	boot_dir ArchLinux /dev/sda1
 	;;
     '7')
-	boot_img /quirky-pi2-sd-8gb-xerus-8.1.img /dev/sda1
+	# non working entry.
+	# seems the binaries are not compatible.
+        boot_img /quirky-pi2-sd-8gb-xerus-8.1.img /dev/sda1
+	;;
+    '8')
+	boot_img /ubuntu-16.04-minimal-odroid-xu3-20160706.img /dev/sda1
 	;;
     *)
 	boot_dir slackware-14.2 /dev/mmcblk0p3
@@ -207,12 +210,8 @@ case $ans in
 esac
 
 echo "Something went badly wrong in the initramfs."
+if [ ${debug} -eq 1 ] ; then
+   /bin/sh </dev/tty1 >/dev/tty1
+fi
 panic "Please file a bug on initramfs-tools."
 
-
-
-
-# boot from sub dir in partition
-# boot_dir dir device
-# boot from image.
-# boot_image file device
