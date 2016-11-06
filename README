@@ -1,0 +1,8 @@
+What is in here.
+----------------
+Install and run Slackware 14.2 on Odroid U3
+	see slackware/README
+Also select at boot time, and run several Linux distrubutions from same partition ( installations in subdirectories of the partition ).
+	see multiboot/README
+
+

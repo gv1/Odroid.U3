@@ -1,0 +1,271 @@
+
+	This requires a uInitrd file that has newer version of busybox ( >= 1.25.1 ) and custom init file.
+
+1. Preparing the uInitrd file.
+
+1a. extract uInitrd
+Here is the Makefile for extracting the contents of uInitrd file to root.1 directory.
+
+unpack: initrd
+initrd.gz: ./uInitrd.org
+        dd if=$< of=$@ skip=64 bs=1
+
+initrd: initrd.gz
+        gunzip $<
+        test -d root || mkdir root
+        cd root; cpio -i --make-directories < ../$@
+
+	mkdir root.1
+	(cd root; tar cfz - *) | ( cd root.1; tar xfz - )
+
+Install busybox ( 1.25.1 )
+
+	in initrd extracted, rm -rf bin/*, sbin/* usr/* lib/*
+	mkdir lib/modules
+	install busybox to root.1
+
+	or if installed in _install dir:
+	( cd _install; tar cfz - bin sbin usr ) | ( cd root.1; tar xfz - )
+	
+	cd root.1
+	mkdir slackware
+	mkdir ubuntu
+	also make missing directories:
+	bin   dev  init    proc  run   scripts    sys      tmp     usr
+	conf  etc  lib     root  sbin  slackware  ubuntu  var
+
+Now, create a new init as follows, in root.1:
+
+init:
+
+#!/bin/sh
+set -x
+
+export PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+mount -t sysfs -o nodev,noexec,nosuid sysfs /sys
+mount -t proc -o nodev,noexec,nosuid proc /proc
+ln -sf /proc/mounts /etc/mtab
+
+echo "Loading, please wait..." > /dev/tty1
+
+if ! mount -t devtmpfs -o nosuid,mode=0755 udev /dev; then
+	echo "W: devtmpfs not available, falling back to tmpfs for /dev"
+	mount -t tmpfs -o nosuid,mode=0755 udev /dev
+	[ -e /dev/console ] || mknod -m 0600 /dev/console c 5 1
+	[ -e /dev/null ] || mknod /dev/null c 1 3
+fi
+
+mkdir /dev/pts
+mount -t devpts -o noexec,nosuid,gid=5,mode=0620 devpts /dev/pts || true
+mount -t tmpfs -o "noexec,nosuid,size=10%,mode=0755" tmpfs /run
+mkdir -m 0755 /run/initramfs
+
+# echo "first shell" > /dev/tty1
+# /bin/sh < //dev/tty1 > /dev/tty1
+
+export init=/sbin/init
+# export quiet=n
+export rootmnt=/root
+# echo "second shell" > /dev/tty1
+# /bin/sh < /dev/tty1 > /dev/tty1
+
+echo "mount /root" > /dev/tty1
+mount /dev/mmcblk0p3 ${rootmnt}
+
+# test -d ${rootmnt}/ubuntu-16.04.1.lts && mount --bind ${rootmnt}/ubuntu-16.04.1.lts /ubuntu
+
+echo "move dev etc to /root" > /dev/tty1
+
+move_dirs()
+{
+  rootmnt=$1
+  udevadm control --exit
+  mount -n -o move /dev ${rootmnt}/dev
+  rm -rf /dev
+  ln -s ${rootmnt}/dev /dev
+  mount -n -o move /run ${rootmnt}/run
+  mount -n -o move /sys ${rootmnt}/sys
+  mount -n -o move /proc ${rootmnt}/proc
+}
+
+# echo "third shell" > /dev/tty1
+# /bin/sh < /dev/tty1 > /dev/tty1
+echo "run-init" > /dev/tty1
+
+# slackware OK
+boot_slackware ()
+{
+  slackware=/root/slackware-14.2
+  mount --bind ${slackware} /slackware
+  rootmnt=/slackware
+  move_dirs ${rootmnt}
+  cd ${rootmnt}
+  pivotroot . initrd
+  # exec chroot . /sbin/init <dev/console >dev/console 2>&1
+}
+
+# exec run-init  /ubuntu ${init} "$@"  <ubuntu/dev/console >/ubuntu/dev/console 2>&1
+# exec run-init  ${rootmnt} ${init} "$@"  <${rootmnt}/dev/console >${rootmnt}/dev/console 2>&1
+boot_ubuntu ()
+{
+  ubuntu=/root/ubuntu-16.04.1.lts  
+  mount --bind ${ubuntu} /ubuntu
+  export rootmnt=/ubuntu
+  move_dirs ${rootmnt}
+  cd ${rootmnt}
+  pivotroot . initrd
+  # exec chroot . /sbin/init <dev/console >dev/console 2>&1
+}
+# ubuntu OK
+# boot_ubuntu 
+echo "" > /dev/tty1
+echo "Choose os to boot " > /dev/tty1
+echo "	enter 1 for Slackware 14.2" > /dev/tty1
+echo "  enter 2 for Ubuntu " > /dev/tty1
+echo "  any other for Slackware 14.2" > /dev/tty1
+echo "        " > /dev/tty1
+read -t 10 ans </dev/tty1 >/dev/tty1 2>&1
+
+case $ans in 
+	"1")
+		boot_slackware	
+	;;
+	"2")
+		boot_ubuntu
+	;;
+	*)
+		boot_slackware
+	;;
+esac
+
+exec chroot . /sbin/init <dev/console >dev/console 2>&1
+echo "Something went badly wrong in the initramfs."
+panic "Please file a bug on initramfs-tools."
+
+
+Create new uInitrd:
+Makefile for creating new uInitrd
+
+uInitrd:
+        ( cd root.1; find . | cpio --quiet -o -H newc  > ../initrd )
+        gzip -9 initrd;
+        mv initrd.gz initrd
+        mkimage -C none -A arm -O linux -T ramdisk -a 0x0 -e 0x0 -n initrd -d in
+itrd uInitrd
+
+Install new uInitrd:
+
+	mount /dev/mmcblk0p1 /flash
+        cp uInitrd /flash
+        sync
+        umount /flash
+
+	and reboot!
+
+Modified boot.ini
+
+boot.ini in /dev/mmcblk0p1:
+
+ODROID4412-UBOOT-CONFIG
+
+# U-Boot Configuration
+setenv initrd_high "0xffffffff"
+setenv fdt_high "0xffffffff"
+
+# --- Screen Configuration for HDMI --- # 
+# ---------------------------------------
+# Uncomment only ONE line! Leave all commented for automatic selection.
+# Uncomment only the setenv line!
+# ---------------------------------------
+# 1920x1080 (1080P) with monitor provided EDID information. (1080p-edid)
+# setenv videoconfig "video=HDMI-A-1:1920x1080@60"
+# -----------------------------------------------
+# 1920x1080 (1080P) without monitor data using generic information (1080p-noedid)
+# setenv videoconfig "drm_kms_helper.edid_firmware=edid/1920x1080.bin"
+# -----------------------------------------------
+# 1280x720 (720P) with monitor provided EDID information. (720p-edid)
+# setenv videoconfig "video=HDMI-A-1:1280x720@60"
+# -----------------------------------------------
+# 1280x720 (720P) without monitor data using generic information (720p-noedid)
+# setenv videoconfig "drm_kms_helper.edid_firmware=edid/1280x720.bin"
+# -----------------------------------------------
+# 1024x768 without monitor data using generic information
+# setenv videoconfig "drm_kms_helper.edid_firmware=edid/1024x768.bin"
+# -----------------------------------------------
+
+setenv videoconfig "drm_kms_helper.edid_firmware=edid/1024x768.bin"
+
+# Load kernel and initramfs
+fatload mmc 0:1 0x40008000 zImage
+fatload mmc 0:1 0x42000000 uInitrd
+
+# boot arguments
+setenv bootargs "console=tty1 console=ttySAC1,115200n8 root=/dev/mmcblk0p3 rootwait ro mem=2047M ${videoconfig}"
+
+# boot the board
+bootm 0x40008000 0x42000000
+
+prepare mmcblk0p3:
+	mkfs.ext4 /dev/mmcblk0p3 or so
+	mount /dev/mmcblk0p3 mnt
+	cd mnt
+
+	mkdir slackware-14.2  
+	mkdir slackware
+	mkdir slackware-14.2.setup  
+
+Installing ubuntu.
+Ubuntu can be installed from an sdcard if you aread did a dd installation onto a micro sd card, or you can
+unxz the image and mount the partition from it to copy files from.
+
+	mkdir ubuntu-16.04.1.lts
+	mkdir ubuntu
+
+copy files from ubuntu installed on an sdcard to ubuntu-16.04.1.lts
+	mount /dev/sdXn /where/ubuntu/mounted
+	( cd /where/ubuntu/mounted ; tar cfz - *) | (cd ubuntu-16.04.1.lts ; tar xfz - )
+
+copy files direct from ubuntu image.
+	unxz ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz
+	parted -s ubuntu-16.04-mate-odroid-u2u3-20160920.img unit B print
+	Note the start offset of partition 2 from the output of parted.
+	p2offset=....
+	mount second partition from ubuntu-16.04-mate-odroid-u2u3-20160920.img -
+	mount -o loop,ro,offset=$p2offset ubuntu-16.04-mate-odroid-u2u3-20160920.img /where/ubuntu/mounted
+	( cd /where/ubuntu/mounted ; tar cfz - *) | (cd ubuntu-16.04.1.lts ; tar xfz - )
+	
+copy files from slackware installed to slackware-14.2
+	( cd /where.slackware.mounted ; tar cfz - *) | (cd slackware-14.2; tar xfz - )
+
+install slackware installer to slackwarearm-14.2.setup
+	cd slackwarearm-14.2.setup
+	gzcat ../slackwarearm-14.2/isolinux/initrd-armv7.img | cpio -i --make-directories
+        sync
+        cd lib
+        rm -rf modules/*
+        rm -rf firmware/*
+	(cd //where/ubuntu/mounted/lib; tar cfz - modules firmware ) | ( tar xfz - )	
+File etc/inittab needs a bit of modification:
+here is the diff:
+4c4
+< ::sysinit:/etc/rc.d/rc.S
+---
+> ::sysinit:/etc/rc.d/rc.S >/dev/tty1 </dev/tty1 2>&1
+10a11
+> tty1::askfirst:-/bin/bash -l
+
+Also etc/rc.d/rc.S
+here is the diff:
+
+250,251c250,251
+< echo -n "slackware login: "
+< read BOGUS_LOGIN
+---
+> # echo -n "slackware login: "
+> # read BOGUS_LOGIN
+
+	use this to boot into slackware installer, and install into mmcblk0p2 and later
+	move entire files ( except slackwarearm-14.2.installer and ubuntu-16.04.1.lts ) to /slackwarearm-14.2
+
+reboot and enjoy.

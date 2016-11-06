@@ -1,0 +1,156 @@
+Installing Slackware 14.2 on Odroid U3, 3 partition method.
+-----------------------------------------------------------
+
+
+	And probably any other distribution suitable for odroid u3. In 3 partition method, installer root , like from initrd image, is installed onto second partion, and booted to install the distribution to third partition. You may refer
+to multiboot document ( README.odroid.u3.multiboot ) to do a two partition method of installation. It is a bit more complicated than three partition method.
+
+1. Requirements. 
+
+	1. 16/32 GB Micro SD card
+		you may also install on to a pen drive or external hard disk
+	for usb and boot from there. But you still will require a micro sd card for booting.
+
+	2. A working Ubuntu image like ubuntu-16.04.1.lts
+		http://dn.odroid.com/4412/Linux/ubuntu_16.04lts/ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz
+		ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz
+
+	3. Slackware 14.2 for arm 
+		http://ftp.arm.slackware.com/slackwarearm/slackwarearm-14.2
+		rsync --exclude '*/source/*' --exclude '*/testing/*' -Pavv --delete ftp.arm.slackware.com::slackwarearm/slackwarearm-14.2 .
+
+2. Installation.
+	Preparing the sd card on a PC or Odroid:
+	/dev/sdX
+	1. Install the u-boot header and FAT partiotion for zIamge, uInitrd and boot.ini
+		unxz ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz
+		xzcat --verbose ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=/dev/sdX count=300000
+
+	2. Create partitions on SD card
+		fdisk /dev/sdX 
+
+		From partition created by dd from img in step 1, delete second and add three more
+( or as many desired ). 
+		First partion created from the image has size of ~128MB.
+		Make this partition bootable ( Boot flag on ), if not already so.
+		Size of second partion should hold the installer initrd ( uncompressed ) and also the distribution (slackware) for installation, something like 4GB.
+		Third partition is where the distributions are installed. Size in the order of 24GB or so.
+		Fourth is the swap partion - 2GB or so.
+
+	Device         Boot    Start      End  Sectors  Size Id Type
+	/dev/sdX1 *        6144   268287   262144  128M  6 FAT16
+	/dev/sdX2        268288  8656895  8388608    4G 83 Linux
+	/dev/sdX3       8656896 58988543 50331648   24G 83 Linux
+	/dev/sdX4      58988544 62945279  3956736  1.9G 82 Linux swap
+
+	3. mount partition two, install initrd image, copy kernel modules,
+	firmware and installation sources.
+		mkdir odroid
+		cd ordoid
+		mkdir boot
+		mkdir root
+		mkfs.ext4 /dev/sdX2
+		tune2fs /dev/sdX2 -L installer
+		mount /dev/sdX2 boot
+		# copy / download distribution files, say slackwarearm-14.2 to boot/
+		wget http://www.arm.slackware.com/slackwarearm/slackwarearm-14.2/isolinux/initrd-armv7.img
+		or
+		mkdir boot/slackwarearm-14.2
+		cd boot/slackwarearm-14.2
+		For downloading:
+		Refer to http://arm.slackware.com and also consider donations.
+		cd slackwarearm-14.2
+		rsync --exclude '*/source/*' --exclude '*/testing/*' -Pavv --delete ftp.arm.slackware.com::slackwarearm/slackwarearm-14.2 .
+		cd ../..
+			
+		cd boot
+		gzip -dc ../slackwarearm-14.2/isolinux/initrd-armv7.img | cpio -i --make-directories
+		sync
+		cd lib
+		rm -rf modules/*
+		rm -rf firmware/*
+		# mount and copy 
+	4. install ubuntu on third partition, copy module and firmware files to installer partition.
+		mkdir ubuntu
+		
+		if you have the image installed onto an sd card, use the second partition from there.
+		mount -r /dev/sdY2 ubuntu
+		or 
+		if you only have the image ( first unxz ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz )
+		parted -s ubuntu-16.04-mate-odroid-u2u3-20160920.img unit B print
+		find partition 2 start offset from the output.
+		p2offset=....
+		mount second partition from ubuntu-16.04-mate-odroid-u2u3-20160920.img -
+		mount -o loop,ro,offset=$p2offset ubuntu-16.04-mate-odroid-u2u3-20160920.img ubuntu
+
+		mkfs.ext4 /dev/sdX3
+		tune2fs /dev/sdX3 -L slackware14.2
+		mount /dev/sdX3 root
+		mkdir root/ubuntu-16.04.1.lts
+		mkdir root/installer
+		mkdir root/slackware-14.2
+		(cd ubuntu; tar cfz - *) | (cd root/ubuntu-16.04.1.lts; tar xfz - )
+		copy modules and firmware? to installer.
+		(cd root/ubuntu-16.04.1.lts/lib/ ; tar cfz - modules firmware ) | (cd boot/lib/; tar xfz - )
+		sync
+		sync
+		umount ubuntu
+		umount boot
+		umount root
+	5. modify boot.ini to boot from installer partition.
+		setenv videoconfig "drm_kms_helper.edid_firmware=edid/1024x768.bin"
+		setenv bootargs "console=tty1 console=ttySAC1,115200n8 root=/dev/mmcblk0p2 rootwait ro mem=2047M ${videoconfig}"
+
+	6. Reboot odroid, and if everything goes fine, will boot into slackware installer.
+		press enter to login as root
+		run setup:
+			setup
+		During installation,
+		Choose partition 3 as target, and dont' format it. It already has Ubuntu on it.
+		Choose source directory for installation  - /slackwarearm-14.2/slackware
+		Proceed with the normal slackware installation.
+
+	7. modify boot.ini and reboot.
+		mount /dev/sdX1 boot
+		edit and modify boot/boot.ini to boot from parition 3
+	setenv bootargs "console=tty1 console=ttySAC1,115200n8 root=/dev/mmcblk0p3 rootwait ro mem=2047M ${videoconfig}"
+		sync
+		umount boot 	
+	8. If you are planning for multiboot
+		cd root
+		mv * slackware-14.2
+		mv slackware-14.2/ubuntu-16.04.1.lts .
+		now you have both Slackware and Ubuntu on same partition.
+		See README.odroid.u3.multiboot to see how to get a multiboot setup ( choose distribution at boot time ) so that you can choose the distribution at boot time. No fancy chooser this time, you need to enter the number corresponding to the distro at a prompt.
+		
+Other info
+	
+Mouse pointer issue.
+	Xorg ( with blackbox wm ) seems have no mouse curser until you open an xterm or so by clicking the right mouse button. Mouse pointer is okay if you have an .xinitrc that starts an xterm or so.
+
+No web browsers.
+	Browsers you can compile and run on odroid u3, slackware 14.2:
+	sadly none of these browsers are available in the distribution. text based ones like lynx are there. Emacs supports web browsing mode too.
+
+		Dillo version 3.0.5  ( fast , but premitive ) first step
+		Mozilla Firefox 50.0 ( compile from source, took long time like more than 6 hours)
+	
+
+No libreoffice.
+	Office - fail
+		Libreoffice libreoffice-5.2.2.2 compiled fine( took very long time, 12 hours or more ) starts, but fall into libreoffice docuement discovery and fail (repeat):
+
+(soffice:1091): Gtk-WARNING **: Theme parsing error: <data>:1:59: 'min-width' is not a valid property name
+
+(soffice:1091): Gtk-WARNING **: Theme parsing error: <data>:1:76: 'min-height' is not a valid property name
+				
+Shutdown seems not shutdown/poweroff complete, but keeps printing message, should not have reached here.	
+But no other issues on reboot after shutdown.
+			
+
+		
+			
+
+	
+	
+
