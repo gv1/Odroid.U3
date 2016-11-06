@@ -1,23 +1,14 @@
-# all: uInitrd
-unpack: initrd
-initrd.gz: ./uInitrd.org
-	dd if=$< of=$@ skip=64 bs=1
+# prepare slackware installer partition in 3 partition method.
+unpack: root
 
-initrd: initrd.gz
-	gunzip $<
-	test -d root || mkdir root
-	cd root; cpio -i --make-directories < ../$@
+root:
+	( test -d root || mkdir root )
+	# mountpoint root || mount /dev/mmcblk0p2 root
+	# http://www.arm.slackware.com/slackwarearm/slackwarearm-14.2/isolinux/initrd-armv7.img
+	(cd root ; gzip -dc ../initrd-armv7.img | cpio -i --make-directories )
+	(cd root ; rm -rf lib/modules/4.4.14-armv7 lib/firmware )
+	(cd /ubuntu-16.04.1.lts/lib/modules ; tar cfz - 3.8.13.30 ) | (cd root/lib/modules; tar xfz - )
+	(cd /ubuntu-16.04.1.lts/lib; tar cfz - firmware ) | (cd root/lib; tar xfz - )
 
-uInitrd:
-	( cd root.1; find . | cpio --quiet -o -H newc  > ../initrd )
-	gzip -9 initrd; 
-	mv initrd.gz initrd 
-	mkimage -C none -A arm -O linux -T ramdisk -a 0x0 -e 0x0 -n initrd -d initrd uInitrd
-	# mount /dev/mmcblk0p1 /flash
-	# cp uInitrd /flash
-	# sync
-	# umount /flash
-	
 clean:
-	rm -f initrd
-	rm -f uInitrd
+	rm -f root
