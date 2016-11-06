@@ -65,12 +65,11 @@ boot_distro ()
   exec chroot . ${init} <dev/console >dev/console 2>&1
 }
   
-# ubuntu OK
-# boot_ubuntu 
 echo "" > /dev/tty1
 echo "Choose os to boot " > /dev/tty1
 echo "	enter 1 for Slackware 14.2" > /dev/tty1
-echo "  enter 2 for Ubuntu " > /dev/tty1
+echo "	enter 2 for Slackware 14.2 setup" > /dev/tty1
+echo "  enter 3 for Ubuntu " > /dev/tty1
 echo "  any other for Slackware 14.2" > /dev/tty1
 echo "        " > /dev/tty1
 # default, slackware, 10 seconds timeout.
