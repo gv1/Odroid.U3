@@ -95,7 +95,7 @@ case $ans in
 		# xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=x.img count=100
 		# file x.img
 		# rm x.img
-		6.04-mate-odroid-u2u3-20160920.img.xz | dd of=ubuntu-16.04-mate-odroid-u2u3-20160920.img count=9216000 skip=268288
+		# xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=ubuntu-16.04-mate-odroid-u2u3-20160920.img count=9216000 skip=268288
 		loopdev=$(losetup -f /root/images/ubuntu-16.04-mate-odroid-u2u3-20160920.img )
 		# mount /dev/sda2 /root/mnt
 		# mount $(loopdev) /root/ubuntu-16.04.1.lts

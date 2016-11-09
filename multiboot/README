@@ -38,6 +38,7 @@ Now, create a new init as follows, in root.1:
 
 init:
 
+
 #!/bin/sh
 set -x
 
@@ -93,53 +94,61 @@ move_dirs()
 # /bin/sh < /dev/tty1 > /dev/tty1
 echo "run-init" > /dev/tty1
 
-# slackware OK
-boot_slackware ()
+boot_distro ()
 {
-  slackware=/root/slackware-14.2
-  mount --bind ${slackware} /slackware
-  rootmnt=/slackware
+  distro=$1
+  mnt=$2
+  mount --bind ${distro} ${mnt}
+  rootmnt=${mnt}
   move_dirs ${rootmnt}
   cd ${rootmnt}
   pivotroot . initrd
-  # exec chroot . /sbin/init <dev/console >dev/console 2>&1
+  exec chroot . ${init} <dev/console >dev/console 2>&1
 }
-
-# exec run-init  /ubuntu ${init} "$@"  <ubuntu/dev/console >/ubuntu/dev/console 2>&1
-# exec run-init  ${rootmnt} ${init} "$@"  <${rootmnt}/dev/console >${rootmnt}/dev/console 2>&1
-boot_ubuntu ()
-{
-  ubuntu=/root/ubuntu-16.04.1.lts  
-  mount --bind ${ubuntu} /ubuntu
-  export rootmnt=/ubuntu
-  move_dirs ${rootmnt}
-  cd ${rootmnt}
-  pivotroot . initrd
-  # exec chroot . /sbin/init <dev/console >dev/console 2>&1
-}
+  
 # ubuntu OK
 # boot_ubuntu 
 echo "" > /dev/tty1
 echo "Choose os to boot " > /dev/tty1
 echo "	enter 1 for Slackware 14.2" > /dev/tty1
 echo "  enter 2 for Ubuntu " > /dev/tty1
+echo "  enter 3 for Slackware setup " > /dev/tty1
+echo "  enter 4 to boot ubuntu-16.04-mate-odroid-u2u3-20160920.img" >> /dev/tty1
 echo "  any other for Slackware 14.2" > /dev/tty1
 echo "        " > /dev/tty1
+# default, slackware, 10 seconds timeout.
+ans=1
 read -t 10 ans </dev/tty1 >/dev/tty1 2>&1
 
 case $ans in 
-	"1")
-		boot_slackware	
+	'1')
+		boot_distro /root/slackware-14.2 /slackware
 	;;
-	"2")
-		boot_ubuntu
+	'2')
+		boot_distro /root/ubuntu-16.04.1.lts /ubuntu
+	;;
+	'3')
+		boot_distro /root/slackware-14.2.setup /slackware
+	;;
+	'4')
+		# test -d /root/ubuntu-16.04.1.lts || mkdir /root/ubuntu-16.04.1.lts
+		# find info about partitions
+		# xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=x.img count=100
+		# file x.img
+		# rm x.img
+		6.04-mate-odroid-u2u3-20160920.img.xz | dd of=ubuntu-16.04-mate-odroid-u2u3-20160920.img count=9216000 skip=268288
+		loopdev=$(losetup -f /root/images/ubuntu-16.04-mate-odroid-u2u3-20160920.img )
+		# mount /dev/sda2 /root/mnt
+		# mount $(loopdev) /root/ubuntu-16.04.1.lts
+		mount /dev/loop0 /root/ubuntu-16.04.1.lts
+		# /bin/sh </dev/tty1 >/dev/tty1 2>&1
+		boot_distro /root/ubuntu-16.04.1.lts /ubuntu
 	;;
 	*)
-		boot_slackware
+		boot_distro /root/slackware-14.2 /slackware
 	;;
 esac
 
-exec chroot . /sbin/init <dev/console >dev/console 2>&1
 echo "Something went badly wrong in the initramfs."
 panic "Please file a bug on initramfs-tools."
 
@@ -267,5 +276,21 @@ here is the diff:
 
 	use this to boot into slackware installer, and install into mmcblk0p2 and later
 	move entire files ( except slackwarearm-14.2.installer and ubuntu-16.04.1.lts ) to /slackwarearm-14.2
+
+Booting from the disk image file
+1. find information about the disk image:
+xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=x.img count=100
+file x.img
+eg:
+x.img: DOS/MBR boot sector; partition 1 : ID=0x6, start-CHS (0x0,97,34), end-CHS (0x10,178,34), startsector 6144, 262144 sectors; partition 2 : ID=0x83, start-CHS (0x60,0,1), end-CHS (0x24e,94,16), startsector 268288, 9216000 sectors
+
+from this output, use the start sector and size of image required. 
+for the eg. above:
+2. extract the file system image.
+xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=ubuntu-16.04-mate-odroid-u2u3-20160920.img count=9216000 skip=268288
+3. copy image file to a destination like /root/images/ where root is where the root partition is mounted during uInitrd boot.
+4. Use the init file as above for booting the image copied.
+
+rm x.img
 
 reboot and enjoy.
