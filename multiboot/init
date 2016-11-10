@@ -56,13 +56,21 @@ echo "run-init" > /dev/tty1
 boot_distro ()
 {
   distro=$1
-  mnt=$2
+  dropshell=$2
+  mnt=/root
   mount --bind ${distro} ${mnt}
   rootmnt=${mnt}
   move_dirs ${rootmnt}
   cd ${rootmnt}
+  if [ $2 -eq 1 ] ; then
+    /bin/sh </dev/tty1 >/dev/tty1 2>&1
+  fi
   pivotroot . initrd
-  exec chroot . ${init} <dev/console >dev/console 2>&1
+  if [ $2 -eq 2 ] ; then
+    exec chroot . /bin/sh </dev/console >/dev/console 2>&1
+  else
+    exec chroot . ${init} <dev/console >dev/console 2>&1
+  fi
 }
   
 # ubuntu OK
@@ -73,6 +81,7 @@ echo "	enter 1 for Slackware 14.2" > /dev/tty1
 echo "  enter 2 for Ubuntu " > /dev/tty1
 echo "  enter 3 for Slackware setup " > /dev/tty1
 echo "  enter 4 to boot ubuntu-16.04-mate-odroid-u2u3-20160920.img" >> /dev/tty1
+echo "  enter 5 to boot piCore-8.0"  > /dev/tty1
 echo "  any other for Slackware 14.2" > /dev/tty1
 echo "        " > /dev/tty1
 # default, slackware, 10 seconds timeout.
@@ -81,14 +90,14 @@ read -t 10 ans </dev/tty1 >/dev/tty1 2>&1
 
 case $ans in 
 	'1')
-		boot_distro /root/slackware-14.2 /slackware
-	;;
+		boot_distro /root/slackware-14.2 
+		;;
 	'2')
-		boot_distro /root/ubuntu-16.04.1.lts /ubuntu
-	;;
+		boot_distro /root/ubuntu-16.04.1.lts
+		;;
 	'3')
-		boot_distro /root/slackware-14.2.setup /slackware
-	;;
+		boot_distro /root/slackware-14.2.setup
+		;;
 	'4')
 		# test -d /root/ubuntu-16.04.1.lts || mkdir /root/ubuntu-16.04.1.lts
 		# find info about partitions
@@ -101,11 +110,14 @@ case $ans in
 		# mount $(loopdev) /root/ubuntu-16.04.1.lts
 		mount /dev/loop0 /root/ubuntu-16.04.1.lts
 		# /bin/sh </dev/tty1 >/dev/tty1 2>&1
-		boot_distro /root/ubuntu-16.04.1.lts /ubuntu
-	;;
+		boot_distro /root/ubuntu-16.04.1.lts
+		;;
+	'5')
+		boot_distro /root/piCore-8.0 
+		;;
 	*)
-		boot_distro /root/slackware-14.2 /slackware
-	;;
+		boot_distro /root/slackware-14.2
+		;;
 esac
 
 echo "Something went badly wrong in the initramfs."
