@@ -5,7 +5,7 @@ Install and run Slackware 14.2 on Odroid U3
 
 Also select at boot time, and run several Linux distrubutions from same partition ( installations in subdirectories of the partition ).
 
-You may also boot from file system image. A sample file system organisation for multiboot looks like this
+You may also boot from file system image. A sample file system organization for multiboot looks like this
 	
 
 	/dev/mmcblk0p3:	
@@ -16,6 +16,8 @@ You may also boot from file system image. A sample file system organisation for 
 	slackware-14.2/  
 	slackware-14.2.setup/  
 	ubuntu-16.04.1.lts/
+	root/
+	piCore-8.0/
 
 You may also have these files on a pendrive or an external hard disk.
 Please see the init file for more information on how to do this.

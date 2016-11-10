@@ -294,6 +294,6 @@ xzcat ubuntu-16.04-mate-odroid-u2u3-20160920.img.xz | dd of=ubuntu-16.04-mate-od
 rm x.img
 
 Incase of problem.
-	Since we are using kernel 3.8.13.30. make sure the /lib/modules/3.8.13.30 is copied from ubuntu.
+	Since we are using kernel 3.8.13.30, make sure that /lib/modules/3.8.13.30 is copied from Ubuntu-16.04.1.lts. And also the firmware directory in /lib.
 
 reboot and enjoy.
