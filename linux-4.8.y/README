@@ -1,0 +1,18 @@
+
+see u-boot-stable for a u-boot.bin file that works with this version of kernel.
+
+kernel: linux-odroid-public-odroid-4.8.y
+make exynos_defconfig
+make zImage modules firmware dtbs -j4
+	( From dtb only required is ./arch/arm/boot/dts/exynos4412-odroidu3.dtb
+ )
+	ignore problem with exynos5410-odroidxu.dtb. exynos4412-odroidu3.dtb is built before that.
+
+mount /dev/mmcblk0p1 /flash/
+cp arch/arm/boot/zImage /flash
+make modules_install
+mv /lib/firmware /lib/firmware.old
+make firmware_install
+#make dtb_install
+cp arch/arm/boot/dts/exynos4412-odroidu3.dtb /flash
+

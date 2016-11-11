@@ -25,3 +25,7 @@ Please see the init file for more information on how to do this.
 	see multiboot/README
 
 
+u-boot-stable, linux-4.8.7
+	2016.07 version. works with 4.8.y kernel. these are not required
+for slackware or multiboot. If linux-4.8.y is choosen, use modules and firmware
+for linux-4.8.y with distributions in /root/your.distro/lib/ or target /lib/
