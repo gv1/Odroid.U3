@@ -458,7 +458,8 @@ CONFIG_DM_I2C_COMPAT=y
 #
 # LED Support
 #
-# CONFIG_LED is not set
+CONFIG_LED=y
+CONFIG_LED_GPIO=y
 
 #
 # Mailbox Controller Support
@@ -637,7 +638,7 @@ CONFIG_DM_USB=y
 #
 # USB peripherals
 #
-# CONFIG_USB_STORAGE is not set
+CONFIG_USB_STORAGE=y
 # CONFIG_USB_KEYBOARD is not set
 CONFIG_USB_GADGET=y
 # CONFIG_USB_GADGET_ATMEL_USBA is not set
