@@ -12,3 +12,19 @@ make firmware_install
 #make dtb_install
 cp arch/arm/boot/dts/exynos4412-odroidu3.dtb /flash
 
+Files in linux-4.8.y:
+kerenel, modules and firmware:
+	zImage
+	4.8.4.modules.tgz   
+	4.8.4.firmware.tgz  
+
+dtb file, which should go along with firmware and uInitrd to boot partition
+( /dev/mmcblk0p1 )
+
+	exynos4412-odroidu3.dtb  
+	exynos4412-odroidu3.dts
+
+In case of compilation of kernel, use this config file as .config
+	config  
+
+	use boot.scr, uInitrd from u-boot-stable, for 4.8.y
