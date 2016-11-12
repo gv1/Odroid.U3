@@ -37,3 +37,30 @@ screen size not proper, though 1024x768 seleted
 seems like exactly what is mensioned in doc/README.odroid probably kernel
 configuration issue.
 
+Files here:
+These files are used with sd_fusing.sh / sd_fusing_all.sh
+
+	sd_fusing.all.sh
+	sd_fusing.sh
+
+	bl1.HardKernel
+	bl2.HardKernel
+	tzsw.HardKernel
+	u-boot-dtb.bin
+	u-boot.bin
+	u-boot.bin.HardKernel
+
+u-boot script boot.scr goes to partition where u-boot finds zImage etc. /dev/mmcblk0p1
+Run
+	boot.scr.sh boot.txt
+
+	boot.scr.sh
+	boot.txt
+	boot.scr
+
+use this file if compiling u-boot-stable, as .config
+	config
+
+uInitrd file, goes to /dev/mmcblk0p1 or so where u-boot looks for these files.
+This supports multiboot. Don't use this file for slackware-14.2 ( single distribution installation )
+	uInitrd
